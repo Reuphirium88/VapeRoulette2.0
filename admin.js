@@ -16,11 +16,18 @@ function escapeHtml(s) {
 
 async function apiMe() {
   // Build headers that include Telegram WebApp user/initData if available so backend
-  // can identify the user inside the WebApp without relying on external injection.
+  // can identify the user inside the WebApp. Wait for tg.ready() when possible
+  // because the SDK may initialize slightly after the page script runs.
   const headers = { 'Content-Type': 'application/json' };
   try {
     if (window.Telegram && window.Telegram.WebApp) {
       const tg = window.Telegram.WebApp;
+      try {
+        if (typeof tg.ready === 'function') tg.ready();
+      } catch (e) {
+        // ignore
+      }
+      // Prefer using initDataUnsafe.user if available after ready()
       if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
         headers['X-Telegram-User'] = JSON.stringify(tg.initDataUnsafe.user);
       }
