@@ -30,7 +30,7 @@ function showToast(text, ms = 2500) {
   setTimeout(() => t.hidden = true, ms);
 }
 
-const API_BASE = window.API_BASE_URL || '';
+const API_BASE = window.API_BASE_URL || 'https://grotesquely-pleasing-reedbuck.cloudpub.ru/';
 
 export async function loadUser() {
   if (!API_BASE) {
