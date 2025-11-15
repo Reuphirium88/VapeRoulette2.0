@@ -32,6 +32,13 @@ if (!tg) {
 // helper to attach Telegram user data to requests
 function getAuthHeaders() {
   const headers = { 'Content-Type': 'application/json' };
+  function encodeHeaderValue(s) {
+    try {
+      return btoa(unescape(encodeURIComponent(s)));
+    } catch (e) {
+      try { return btoa(s); } catch(_) { return encodeURIComponent(s); }
+    }
+  }
   try {
     // If Telegram WebApp is available, prefer to send both:
     // - X-Telegram-User : JSON object from tg.initDataUnsafe.user (if available)
@@ -39,7 +46,13 @@ function getAuthHeaders() {
     if (tg) {
       try {
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-          headers['X-Telegram-User'] = JSON.stringify(tg.initDataUnsafe.user);
+          try {
+            const raw = JSON.stringify(tg.initDataUnsafe.user);
+            headers['X-Telegram-User'] = encodeHeaderValue(raw);
+            headers['X-Telegram-User-B64'] = '1';
+          } catch (e) {
+            headers['X-Telegram-User'] = JSON.stringify(tg.initDataUnsafe.user);
+          }
         }
       } catch (e) {
         // ignore per-field errors
@@ -58,8 +71,14 @@ function getAuthHeaders() {
       if (!headers['X-Telegram-User']) {
         const raw = sessionStorage.getItem('tg_initDataUnsafe');
         if (raw) {
-          const obj = JSON.parse(raw);
-          if (obj && obj.user) headers['X-Telegram-User'] = JSON.stringify(obj.user);
+          try {
+            const obj = JSON.parse(raw);
+            if (obj && obj.user) {
+              const r = JSON.stringify(obj.user);
+              headers['X-Telegram-User'] = encodeHeaderValue(r);
+              headers['X-Telegram-User-B64'] = '1';
+            }
+          } catch(e) { /* ignore parse errors */ }
         }
       }
       if (!headers['X-Telegram-InitData']) {

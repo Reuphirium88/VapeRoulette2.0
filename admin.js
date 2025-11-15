@@ -56,12 +56,25 @@ async function waitForTgInit(timeout = 1500, interval = 100) {
 
 function buildTgHeaders() {
   const headers = { 'Content-Type': 'application/json' };
+  function encodeHeaderValue(s) {
+    try {
+      return btoa(unescape(encodeURIComponent(s)));
+    } catch (e) {
+      try { return btoa(s); } catch(_) { return encodeURIComponent(s); }
+    }
+  }
   try {
     // Prefer live Telegram SDK if available
     if (window.Telegram && window.Telegram.WebApp) {
       const tg = window.Telegram.WebApp;
       if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-        headers['X-Telegram-User'] = JSON.stringify(tg.initDataUnsafe.user);
+        try {
+          const raw = JSON.stringify(tg.initDataUnsafe.user);
+          headers['X-Telegram-User'] = encodeHeaderValue(raw);
+          headers['X-Telegram-User-B64'] = '1';
+        } catch (e) {
+          headers['X-Telegram-User'] = JSON.stringify(tg.initDataUnsafe.user);
+        }
       }
       const signed = tg.initData || (tg.initDataUnsafe && tg.initDataUnsafe.initData);
       if (signed) headers['X-Telegram-InitData'] = signed;
@@ -82,8 +95,14 @@ function buildTgHeaders() {
           } catch(e) { raw = null; }
         }
         if (raw) {
-          const obj = JSON.parse(raw);
-          if (obj && obj.user) headers['X-Telegram-User'] = JSON.stringify(obj.user);
+          try {
+            const obj = JSON.parse(raw);
+            if (obj && obj.user) {
+              const r = JSON.stringify(obj.user);
+              headers['X-Telegram-User'] = encodeHeaderValue(r);
+              headers['X-Telegram-User-B64'] = '1';
+            }
+          } catch (e) { /* ignore parse errors */ }
         }
       }
       if (!headers['X-Telegram-InitData']) {
