@@ -28,6 +28,7 @@
     <button id="dbg-toggle" style="background:#222;color:#fff;border:0;padding:6px 8px;border-radius:4px;cursor:pointer;opacity:0.9">DBG</button>
     <div id="dbg-panel" style="display:none;background:rgba(0,0,0,0.85);color:#fff;padding:8px;border-radius:6px;margin-top:6px;max-width:420px;max-height:280px;overflow:auto;box-shadow:0 6px 18px rgba(0,0,0,0.5);">
   <div><strong>API_BASE:</strong> <span id="dbg-api">(unknown)</span> — App loaded: <strong id="dbg-apploaded">no</strong></div>
+  <div style="margin-top:4px;font-size:12px;color:#ccc">Load status: <span id="dbg-loadmsg">(unknown)</span></div>
       <div style="margin-top:6px"><strong>Telegram initDataUnsafe:</strong>
         <pre id="dbg-tg" style="white-space:pre-wrap;margin:6px 0;padding:6px;background:rgba(255,255,255,0.03);border-radius:4px;overflow:auto;max-height:120px;">(empty)</pre>
       </div>
@@ -117,6 +118,29 @@
         setInterval(update, 700);
         update();
         try { const pingBtn = document.getElementById('dbg-ping'); const sel = document.getElementById('dbg-candidates'); if (pingBtn && sel) pingBtn.addEventListener('click', () => pingCandidate(sel.value)); } catch(e){}
+
+        // Attempt to load admin script(s) if the admin app hasn't initialised — helps diagnose blocked/missing script
+        try {
+          const loadMsgEl = document.getElementById('dbg-loadmsg');
+          function mark(msg){ try{ if (loadMsgEl) loadMsgEl.textContent = msg; }catch(e){}
+          }
+          if (!window._miniapp) {
+            // try /static/admin.js then admin.js
+            const candidates = ['/static/admin.js','admin.js'];
+            (function tryNext(i){
+              if (i>=candidates.length) return mark('no admin script loaded');
+              const src = candidates[i];
+              const s = document.createElement('script'); s.src = src; s.async = false;
+              s.onload = function(){ mark('loaded ' + src); };
+              s.onerror = function(ev){ mark('failed to load ' + src); // try next
+                tryNext(i+1);
+              };
+              setTimeout(()=>document.body.appendChild(s), 20);
+            })(0);
+          } else {
+            mark('already initialised');
+          }
+        } catch(e){ /* ignore */ }
       } catch(e) { console.debug('dbg init failed', e); }
     })();
   </script>
