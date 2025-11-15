@@ -49,9 +49,45 @@
             <option value="window.API_BASE_URL">window.API_BASE_URL</option>
             <option value="http://127.0.0.1:8000">http://127.0.0.1:8000</option>
           </select>
+            // capture global errors for the overlay
+            try {
+              window._debug_appErrors = window._debug_appErrors || [];
+              window.onerror = function(message, source, lineno, colno, error) {
+                try { window._debug_appErrors.push(String(message) + ' @ ' + source + ':' + lineno + ':' + colno); } catch(e){}
+                return false;
+              };
+              window.addEventListener('unhandledrejection', function(ev){
+                try { window._debug_appErrors.push('unhandledrejection: ' + (ev.reason && ev.reason.stack ? ev.reason.stack : String(ev.reason))); } catch(e){}
+              });
+            } catch(e){}
+
+            // attach run-init handler
+            try {
+              const runBtn = document.getElementById('dbg-runinit');
+              const errorsEl = document.getElementById('dbg-errors');
+              if (runBtn) runBtn.addEventListener('click', async () => {
+                try {
+                  if (typeof window.init === 'function') {
+                    await window.init();
+                    if (errorsEl) errorsEl.textContent = '(ran window.init)';
+                    return;
+                  }
+                  if (window._miniapp && typeof window._miniapp.fetchUser === 'function') {
+                    try { const r = await window._miniapp.fetchUser(); if (errorsEl) errorsEl.textContent = 'fetchUser returned: ' + JSON.stringify(r); } catch(e){ if (errorsEl) errorsEl.textContent = 'fetchUser failed: '+String(e); }
+                    return;
+                  }
+                  if (window._admin && typeof window._admin.fetchAdminUsers === 'function') {
+                    try { const r = await window._admin.fetchAdminUsers(); if (errorsEl) errorsEl.textContent = 'fetchAdminUsers returned: ' + JSON.stringify(r); } catch(e){ if (errorsEl) errorsEl.textContent = 'fetchAdminUsers failed: '+String(e); }
+                    return;
+                  }
+                  await pingCandidate('window.API_BASE');
+                } catch(e) { if (errorsEl) errorsEl.textContent = 'runinit error: '+String(e); }
+              });
+            } catch(e){}
+
         </div>
-      </div>
     </div>
+  </div>
 
   <script>
     // allow overriding API base with ?api=...
@@ -137,7 +173,7 @@
               if (i>=candidates.length) return mark('no admin script loaded');
               const src = candidates[i];
               const s = document.createElement('script'); s.src = src; s.async = false;
-              s.onload = function(){ mark('loaded ' + src); try{ const el = document.getElementById('dbg-apploaded'); if (el) el.textContent = 'yes'; }catch(e){} };
+              s.onload = function(){ mark('loaded ' + src); };
               s.onerror = function(ev){ mark('failed to load ' + src); // try next
                 tryNext(i+1);
               };

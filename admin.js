@@ -202,3 +202,8 @@ async function initAdmin() {
 }
 
 initAdmin().catch(err => console.error(err));
+
+// Expose helpers for the debug overlay to call directly
+window._admin = window._admin || {};
+window._admin.fetchAdminUsers = fetchAdminUsers;
+window._admin.buildTgHeaders = buildTgHeaders;
