@@ -271,6 +271,16 @@ async function init() {
 
   try {
     currentUser = await fetchUser();
+    // If user is admin, open admin panel immediately and skip normal UI
+    if (currentUser && currentUser.is_admin) {
+      try {
+        showAdminPanel(currentUser);
+      } catch (e) {
+        console.error('Failed to open admin panel', e);
+      }
+      return;
+    }
+
     lootboxes = await fetchLootboxes();
     renderUser(currentUser);
     renderLootboxes(lootboxes);
@@ -294,6 +304,86 @@ init().catch(err => console.error(err));
 
 // Debug helper
 window._miniapp = { fetchUser, fetchLootboxes, openLootbox };
+
+// --- Admin UI helpers ---
+async function fetchAdminUsers(adminToken) {
+  const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/admin/users`, {
+    headers: { 'Authorization': `Bearer ${adminToken}` }
+  });
+  if (!res.ok) throw new Error('Failed to fetch admin users');
+  return res.json();
+}
+
+function renderAdminUsers(users) {
+  const container = document.getElementById('admin-users');
+  if (!container) return;
+  if (!users || users.length === 0) {
+    container.innerHTML = '<p>No users found.</p>';
+    return;
+  }
+  const list = document.createElement('div');
+  list.className = 'admin-user-list';
+  users.forEach(u => {
+    const item = document.createElement('div');
+    item.className = 'admin-user';
+    item.innerHTML = `
+      <strong>${escapeHtml(u.name)}</strong> (id: ${u.id}) — XP: <span class="xp-val">${u.xp}</span>
+      <div>
+        <button class="btn-accrue" data-id="${u.id}">+100 XP</button>
+      </div>
+    `;
+    list.appendChild(item);
+  });
+  container.innerHTML = '';
+  container.appendChild(list);
+
+  // attach accrue handlers
+  list.querySelectorAll('.btn-accrue').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.currentTarget.dataset.id;
+      const amount = 100;
+      try {
+        const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/admin/users/${encodeURIComponent(id)}/accrue-xp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentUser.admin_token}` },
+          body: JSON.stringify({ amount, reason: 'admin_manual' })
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(()=>({}));
+          throw new Error(body.detail || 'Failed');
+        }
+        const data = await res.json();
+        // update displayed xp
+        const xpSpan = e.currentTarget.closest('.admin-user').querySelector('.xp-val');
+        if (xpSpan) xpSpan.textContent = data.xp;
+        showToast(`Accrued ${amount} XP to user ${id}`);
+      } catch (err) {
+        console.error('Accrue failed', err);
+        showToast('Failed to accrue XP');
+      }
+    });
+  });
+}
+
+async function showAdminPanel(user) {
+  const adminPanel = document.getElementById('admin-panel');
+  const lootSection = document.querySelector('.lootboxes');
+  if (lootSection) lootSection.hidden = true;
+  // show admin panel and info
+  if (adminPanel) {
+    adminPanel.hidden = false;
+    const info = document.getElementById('admin-info');
+    if (info) info.textContent = `Signed in as admin: ${user.name}`;
+    try {
+      const users = await fetchAdminUsers(user.admin_token);
+      renderAdminUsers(users);
+    } catch (e) {
+      console.error('Failed to load admin users', e);
+      const container = document.getElementById('admin-users');
+      if (container) container.innerHTML = '<p>Failed to load users. Check token/permissions.</p>';
+    }
+  }
+}
 
 // Ensure modal close works even if init fails: attach handlers immediately
 ;(function attachModalHandlers(){
