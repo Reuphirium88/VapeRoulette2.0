@@ -79,17 +79,26 @@ function renderUsers(users, token) {
 
 async function initAdmin() {
   try {
-    const me = await apiMe();
+    const urlParams = new URLSearchParams(location.search);
+    const tokenFromUrl = urlParams.get('token');
+
+    const me = await apiMe().catch(()=>null);
+
+    // Prefer explicit token in URL (developer convenience). Otherwise take token from /api/me
+    const token = tokenFromUrl || (me && me.admin_token);
+
     if (!me || !me.is_admin) {
-      document.getElementById('admin-info').textContent = 'You are not an admin or authentication failed.';
-      return;
+      // If /api/me didn't identify the user as admin but a token was provided via URL,
+      // allow proceeding (useful for local dev when headers/initData aren't forwarded).
+      if (!token) {
+        document.getElementById('admin-info').textContent = 'You are not an admin or authentication failed.';
+        return;
+      }
+      document.getElementById('admin-info').textContent = `Signed in as admin (token provided)`;
+    } else {
+      document.getElementById('admin-info').textContent = `Signed in as admin: ${me.name}`;
     }
-    document.getElementById('admin-info').textContent = `Signed in as admin: ${me.name}`;
-    const token = me.admin_token;
-    if (!token) {
-      document.getElementById('users-list').innerHTML = '<p>No admin token available.</p>';
-      return;
-    }
+    
     const users = await fetchAdminUsers(token);
     renderUsers(users, token);
   } catch (err) {
