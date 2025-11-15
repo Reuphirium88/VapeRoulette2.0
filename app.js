@@ -68,7 +68,10 @@ async function fetchUser() {
   }
 
   try {
-    const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/me`, { headers: getAuthHeaders() });
+    const headers = getAuthHeaders();
+    // Debug: log outgoing headers and API_BASE
+    console.debug('fetchUser: API_BASE=', API_BASE, 'headers=', Object.keys(headers));
+    const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/me`, { headers });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     // Expecting { id, username, full_name, xp_balance }
@@ -97,7 +100,9 @@ async function fetchLootboxes() {
   }
 
   try {
-    const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/lootboxes`, { headers: getAuthHeaders() });
+    const headers = getAuthHeaders();
+    console.debug('fetchLootboxes: API_BASE=', API_BASE, 'headers=', Object.keys(headers));
+    const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/lootboxes`, { headers });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     // Expecting array of { id, name, cost_xp, prize_preview }
