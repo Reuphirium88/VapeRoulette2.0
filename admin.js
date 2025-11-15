@@ -15,30 +15,34 @@ function escapeHtml(s) {
 }
 
 async function apiMe() {
+  // Wait briefly for Telegram WebApp SDK to populate initDataUnsafe (race condition
+  // inside the WebView). Poll for up to 1500ms before giving up.
+  async function waitForTgInit(timeout = 1500, interval = 100) {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      try {
+        if (window.Telegram && window.Telegram.WebApp) {
+          const tg = window.Telegram.WebApp;
+          // call ready() if available to encourage SDK to finish init
+          try { if (typeof tg.ready === 'function') tg.ready(); } catch (e) {}
+          if ((tg.initDataUnsafe && tg.initDataUnsafe.user) || tg.initData) return true;
+        }
+      } catch (e) {}
+      await new Promise(r => setTimeout(r, interval));
+    }
+    return false;
+  }
+
+  await waitForTgInit(1500, 100);
+
   // Build headers that include Telegram WebApp user/initData if available so backend
-  // can identify the user inside the WebApp. Wait for tg.ready() when possible
-  // because the SDK may initialize slightly after the page script runs.
+  // can identify the user inside the WebApp.
   const headers = { 'Content-Type': 'application/json' };
   try {
     if (window.Telegram && window.Telegram.WebApp) {
       const tg = window.Telegram.WebApp;
-      try { if (typeof tg.ready === 'function') tg.ready(); } catch (e) {}
-
-      // Wait briefly for initDataUnsafe to populate (race condition in some WebView builds)
-      const waitForTgUser = async (timeout = 1000, interval = 100) => {
-        const start = Date.now();
-        while (Date.now() - start < timeout) {
-          try {
-            if (tg.initDataUnsafe && tg.initDataUnsafe.user) return tg.initDataUnsafe.user;
-          } catch (e) {}
-          await new Promise(r => setTimeout(r, interval));
-        }
-        return null;
-      };
-
-      const maybeUser = await waitForTgUser(1000, 100);
-      if (maybeUser) {
-        headers['X-Telegram-User'] = JSON.stringify(maybeUser);
+      if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+        headers['X-Telegram-User'] = JSON.stringify(tg.initDataUnsafe.user);
       }
       const signed = tg.initData || (tg.initDataUnsafe && tg.initDataUnsafe.initData);
       if (signed) headers['X-Telegram-InitData'] = signed;
