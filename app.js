@@ -23,8 +23,9 @@ function getAuthHeaders() {
   return headers;
 }
 
-function showToast(text, ms = 2500) {
+function showToast(text, ms = 3500) {
   const t = document.getElementById('toast');
+  if (!t) return console.log(text);
   t.textContent = text;
   t.hidden = false;
   setTimeout(() => t.hidden = true, ms);
@@ -32,43 +33,86 @@ function showToast(text, ms = 2500) {
 
 const API_BASE = window.API_BASE_URL || 'https://grotesquely-pleasing-reedbuck.cloudpub.ru/';
 
-export async function loadUser() {
+// A small mock user for browser-only preview when Telegram.WebApp is absent
+const BROWSER_MOCK_USER = { id: 0, username: 'demo_user', full_name: 'Demo User', xp_balance: 1000 };
+
+// Fetch user from API. On failure, if running in a plain browser (no tg), return a mock user so UI remains interactive.
+async function fetchUser() {
+  const greeting = document.getElementById('greeting');
+  const xpEl = document.getElementById('xp-value');
+  if (greeting) greeting.textContent = 'Loading user...';
+  if (xpEl) xpEl.textContent = '...';
+
   if (!API_BASE) {
-    return { id: 1, name: 'DemoUser', xp: 1250 };
+    // no API configured — return mock
+    return BROWSER_MOCK_USER;
   }
-  const res = await fetch(`${API_BASE}/api/me`, { headers: getAuthHeaders() });
-  if (!res.ok) throw new Error('Failed to load user');
-  return res.json();
+
+  try {
+    const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/me`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    // Expecting { id, username, full_name, xp_balance }
+    return data;
+  } catch (err) {
+    console.error('fetchUser error', err);
+    if (!tg) {
+      showToast('API unavailable — running with mock data');
+      return BROWSER_MOCK_USER;
+    }
+    throw err;
+  }
 }
 
-export async function loadLootboxes() {
+// Fetch lootboxes list from API. On failure, if in browser-only mode, return a small mocked set.
+async function fetchLootboxes() {
+  const list = document.getElementById('lootbox-list');
+  if (list) list.textContent = 'Loading lootboxes...';
+
   if (!API_BASE) {
     return [
-      { id: 'lb-200', cost: 200, title: 'Bronze Box', prizes: ['Small Coil', 'Sticker', '5% off'] },
-      { id: 'lb-500', cost: 500, title: 'Silver Box', prizes: ['Pod', 'E-liquid 10ml', '10% off'] },
-      { id: 'lb-1000', cost: 1000, title: 'Gold Box', prizes: ['Battery', 'E-liquid 50ml', '20% off'] },
-      { id: 'lb-5000', cost: 5000, title: 'Platinum Box', prizes: ['Device', 'Premium Kit', 'Full Refund Coupon'] }
+      { id: 'lb-200', name: 'Bronze Box', cost_xp: 200, prize_preview: ['Sticker', 'Small Coil'] },
+      { id: 'lb-500', name: 'Silver Box', cost_xp: 500, prize_preview: ['Pod', 'E-liquid 10ml'] },
+      { id: 'lb-1000', name: 'Gold Box', cost_xp: 1000, prize_preview: ['Battery', 'E-liquid 50ml'] }
     ];
   }
-  const res = await fetch(`${API_BASE}/api/lootboxes`, { headers: getAuthHeaders() });
-  if (!res.ok) throw new Error('Failed to load lootboxes');
-  return res.json();
+
+  try {
+    const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/lootboxes`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    // Expecting array of { id, name, cost_xp, prize_preview }
+    return data;
+  } catch (err) {
+    console.error('fetchLootboxes error', err);
+    if (!tg) {
+      showToast('Could not load lootboxes — showing demo boxes');
+      return [
+        { id: 'lb-demo-1', name: 'Demo Box A', cost_xp: 100, prize_preview: ['Sample A', 'Sample B'] }
+      ];
+    }
+    throw err;
+  }
 }
 
-export async function openLootbox(box, user) {
+// Open lootbox wrapper (keeps previous behavior). Expects box object in server format.
+async function openLootbox(box, user) {
   if (!API_BASE) {
     // local simulation
     return new Promise((resolve, reject) => {
-      if (user.xp < box.cost) return reject(new Error('Not enough XP'));
+      const cost = box.cost_xp ?? box.cost;
+      const prizes = box.prize_preview ?? box.prizes ?? [];
+      if ((user.xp_balance ?? user.xp) < cost) return reject(new Error('Not enough XP'));
       setTimeout(() => {
-        const prize = box.prizes[Math.floor(Math.random() * box.prizes.length)];
-        user.xp -= box.cost;
-        resolve({ prize, remainingXp: user.xp });
+        const prize = prizes[Math.floor(Math.random() * prizes.length)] || 'Nothing';
+        if (user.xp_balance !== undefined) user.xp_balance -= cost;
+        else if (user.xp !== undefined) user.xp -= cost;
+        resolve({ prize, remaining_xp: user.xp_balance ?? user.xp });
       }, 500);
     });
   }
 
-  const res = await fetch(`${API_BASE}/api/lootboxes/${encodeURIComponent(box.id)}/open`, {
+  const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/lootboxes/${encodeURIComponent(box.id)}/open`, {
     method: 'POST',
     headers: getAuthHeaders(),
   });
@@ -85,23 +129,36 @@ let currentUser = null;
 let lootboxes = [];
 
 function renderUser(user) {
-  const name = document.getElementById('greeting');
-  const xp = document.getElementById('xp-value');
-  name.textContent = `Hello, ${user.name}`;
-  xp.textContent = user.xp;
+  const nameEl = document.getElementById('greeting');
+  const xpEl = document.getElementById('xp-value');
+  if (!nameEl || !xpEl) return;
+  const displayName = (user && (user.full_name || user.username)) || 'Guest';
+  const xp = (user && (user.xp_balance ?? user.xp)) ?? 0;
+  nameEl.textContent = `Hello, ${displayName}`;
+  xpEl.textContent = xp;
 }
 
 function renderLootboxes(boxes) {
   const list = document.getElementById('lootbox-list');
+  if (!list) return;
   list.innerHTML = '';
+  if (!boxes || boxes.length === 0) {
+    list.textContent = 'No lootboxes available.';
+    return;
+  }
+
   boxes.forEach(box => {
+    const title = box.name ?? box.title ?? 'Unnamed Box';
+    const cost = box.cost_xp ?? box.cost ?? 0;
+    const prizes = Array.isArray(box.prize_preview) ? box.prize_preview : (box.prize_preview ? [box.prize_preview] : (box.prizes || []));
+
     const card = document.createElement('div');
     card.className = 'box';
     card.innerHTML = `
-      <h3>${box.title}</h3>
-      <div class="cost">Cost: <strong>${box.cost} XP</strong></div>
-      <div class="prizes">Prizes: ${box.prizes.join(', ')}</div>
-      <button class="open-btn" data-id="${box.id}">Open</button>
+      <h3>${escapeHtml(title)}</h3>
+      <div class="cost">Cost: <strong>${cost} XP</strong></div>
+      <div class="prizes">Prizes: ${escapeHtml(prizes.join(', '))}</div>
+      <button class="open-btn" data-id="${escapeHtml(box.id)}">Open</button>
     `;
     list.appendChild(card);
   });
@@ -110,16 +167,21 @@ function renderLootboxes(boxes) {
   list.querySelectorAll('.open-btn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       const id = e.currentTarget.dataset.id;
-      const box = boxes.find(b => b.id === id);
+      const box = boxes.find(b => String(b.id) === String(id));
       if (!box) return;
       try {
         const result = await openLootbox(box, currentUser);
-        // if server returned remaining_xp, respect it
-        if (result.remaining_xp !== undefined) currentUser.xp = result.remaining_xp;
-        renderUser(currentUser);
+        // prefer server field names if present
+        if (result.remaining_xp !== undefined) {
+          currentUser.xp_balance = result.remaining_xp;
+        } else if (result.remainingXp !== undefined) {
+          currentUser.xp_balance = result.remainingXp;
+        }
+        renderUser(currentUser || BROWSER_MOCK_USER);
         showModal(`You won: ${result.prize}`);
       } catch (err) {
-        showToast(err.message);
+        console.error(err);
+        showToast(err.message || 'Failed to open box');
       }
     });
   });
@@ -127,12 +189,21 @@ function renderLootboxes(boxes) {
 
 function showModal(text) {
   const modal = document.getElementById('modal');
-  document.getElementById('modal-body').textContent = text;
+  const body = document.getElementById('modal-body');
+  if (!modal || !body) return;
+  body.textContent = text;
   modal.hidden = false;
 }
 
 function hideModal() {
-  document.getElementById('modal').hidden = true;
+  const modal = document.getElementById('modal');
+  if (!modal) return;
+  modal.hidden = true;
+}
+
+function escapeHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/[&<>"'`]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;","`":"&#96;" })[c]);
 }
 
 // initialize app
@@ -143,17 +214,30 @@ async function init() {
     // ignore
   }
 
-  currentUser = await loadUser();
-  lootboxes = await loadLootboxes();
-  renderUser(currentUser);
-  renderLootboxes(lootboxes);
+  try {
+    currentUser = await fetchUser();
+    lootboxes = await fetchLootboxes();
+    renderUser(currentUser);
+    renderLootboxes(lootboxes);
+  } catch (err) {
+    console.error('Initialization error', err);
+    showToast('Failed to communicate with API. See console for details.');
+    // try to render whatever we have
+    if (!currentUser) currentUser = !tg ? BROWSER_MOCK_USER : null;
+    if (currentUser) renderUser(currentUser);
+    if (!lootboxes || lootboxes.length === 0) {
+      const list = document.getElementById('lootbox-list');
+      if (list) list.textContent = 'Unable to load lootboxes.';
+    }
+  }
 
   // modal close
-  document.getElementById('modal-close').addEventListener('click', hideModal);
+  const modalClose = document.getElementById('modal-close');
+  if (modalClose) modalClose.addEventListener('click', hideModal);
 }
 
 // Start
 init().catch(err => console.error(err));
 
 // Debug helper
-window._miniapp = { loadUser, loadLootboxes, openLootbox };
+window._miniapp = { fetchUser, fetchLootboxes, openLootbox };
