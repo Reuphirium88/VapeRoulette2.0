@@ -22,14 +22,23 @@ async function apiMe() {
   try {
     if (window.Telegram && window.Telegram.WebApp) {
       const tg = window.Telegram.WebApp;
-      try {
-        if (typeof tg.ready === 'function') tg.ready();
-      } catch (e) {
-        // ignore
-      }
-      // Prefer using initDataUnsafe.user if available after ready()
-      if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-        headers['X-Telegram-User'] = JSON.stringify(tg.initDataUnsafe.user);
+      try { if (typeof tg.ready === 'function') tg.ready(); } catch (e) {}
+
+      // Wait briefly for initDataUnsafe to populate (race condition in some WebView builds)
+      const waitForTgUser = async (timeout = 1000, interval = 100) => {
+        const start = Date.now();
+        while (Date.now() - start < timeout) {
+          try {
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user) return tg.initDataUnsafe.user;
+          } catch (e) {}
+          await new Promise(r => setTimeout(r, interval));
+        }
+        return null;
+      };
+
+      const maybeUser = await waitForTgUser(1000, 100);
+      if (maybeUser) {
+        headers['X-Telegram-User'] = JSON.stringify(maybeUser);
       }
       const signed = tg.initData || (tg.initDataUnsafe && tg.initDataUnsafe.initData);
       if (signed) headers['X-Telegram-InitData'] = signed;
