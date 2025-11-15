@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vape Roulette 2.0</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>Vape Roulette 2.0</h1>
+
+    <div id="xp-balance">
+        Ваш баланс XP: <span id="current-xp">10000</span>
+    </div>
+
+    <div id="lootbox-container">
+        <h2>Лутбоксы</h2>
+
+        <div class="lootbox" data-cost="200">
+            <h3>Лутбокс за 200 XP</h3>
+            <p>Призы:</p>
+            <ul>
+                <li>Наклейка</li>
+                <li>Брелок</li>
+                <li>Скидка 5%</li>
+            </ul>
+            <button class="open-button">Открыть</button>
+        </div>
+
+        <div class="lootbox" data-cost="500">
+            <h3>Лутбокс за 500 XP</h3>
+            <p>Призы:</p>
+            <ul>
+                <li>Жидкость для вейпа (маленькая)</li>
+                <li>Скидка 10%</li>
+                <li>Фирменная футболка</li>
+            </ul>
+            <button class="open-button">Открыть</button>
+        </div>
+
+        <div class="lootbox" data-cost="1000">
+            <h3>Лутбокс за 1000 XP</h3>
+            <p>Призы:</p>
+            <ul>
+                <li>Жидкость для вейпа (большая)</li>
+                <li>Скидка 20%</li>
+                <li>Новый испаритель</li>
+            </ul>
+            <button class="open-button">Открыть</button>
+        </div>
+
+        <div class="lootbox" data-cost="5000">
+            <h3>Лутбокс за 5000 XP</h3>
+            <p>Призы:</p>
+            <ul>
+                <li>Вейп-устройство</li>
+                <li>Большой запас жидкостей</li>
+                <li>Эксклюзивный мерч</li>
+            </ul>
+            <button class="open-button">Открыть</button>
+        </div>
+    </div>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
