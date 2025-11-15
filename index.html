@@ -183,8 +183,20 @@
                 try { const r = await window._miniapp.fetchUser(); if (errorsEl) errorsEl.textContent = 'fetchUser returned: ' + JSON.stringify(r); } catch(e){ if (errorsEl) errorsEl.textContent = 'fetchUser failed: '+String(e); }
                 return;
               }
-              // fallback: try ping candidate API_BASE
-              await pingCandidate('window.API_BASE');
+              // fallback: try several candidate endpoints in order and report first result
+              const candidates = ['window.API_BASE','window.API_BASE_URL','http://127.0.0.1:8000','https://grotesquely-pleasing-reedbuck.cloudpub.ru/'];
+              for (const c of candidates) {
+                try {
+                  let val = '';
+                  if (c === 'window.API_BASE') val = window.API_BASE || '';
+                  else if (c === 'window.API_BASE_URL') val = window.API_BASE_URL || '';
+                  else val = c;
+                  if (!val) continue;
+                  await pingCandidate(c);
+                  return;
+                } catch(e) { /* try next */ }
+              }
+              if (errorsEl) errorsEl.textContent = 'no candidate produced a result';
             } catch(e) { if (errorsEl) errorsEl.textContent = 'runinit error: '+String(e); }
           });
         } catch(e){}
@@ -202,7 +214,7 @@
               if (i>=candidates.length) return mark('no app script loaded');
               const src = candidates[i];
               const s = document.createElement('script'); s.src = src; s.async = false;
-              s.onload = function(){ mark('loaded ' + src); };
+              s.onload = function(){ mark('loaded ' + src); try{ const el = document.getElementById('dbg-apploaded'); if (el) el.textContent = 'yes'; }catch(e){} };
               s.onerror = function(ev){ mark('failed to load ' + src); // try next
                 tryNext(i+1);
               };
