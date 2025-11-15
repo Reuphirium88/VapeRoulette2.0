@@ -5,6 +5,18 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Admin Panel — Loyalty Mini App</title>
   <link rel="stylesheet" href="/static/styles.css">
+  <!-- Inline critical styles so admin UI looks correct inside Telegram WebView even if external CSS fails -->
+  <style>
+    :root{--bg:#071025;--card:#0b1220;--accent:#7c3aed;--muted:#9ca3af}
+    html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#071025 0%, #07182b 100%);color:#e6eef8}
+    main.container{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:22px;box-sizing:border-box}
+    .header{text-align:center;margin-bottom:6px}
+    .header h1{font-size:22px;margin:0;font-weight:700}
+    #admin-info{color:var(--muted);margin-top:6px}
+    #users-list{width:100%;max-width:820px;margin-top:12px}
+    .admin-users .user{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:10px;border-radius:10px;margin-bottom:8px}
+    @media (max-width:420px){main.container{padding:12px}}
+  </style>
   <!-- Telegram Web App SDK (needed inside the Telegram WebView to access initData/user) -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
