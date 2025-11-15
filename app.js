@@ -273,7 +273,22 @@ async function init() {
     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
       const myId = String(tg.initDataUnsafe.user.id);
       if (myId === '212177365') {
-        // Redirect to admin page hosted on the API host so assets and API are same-origin.
+        // Try to obtain a dev admin token from the API and redirect with token
+        // (DEV_ALLOW_INSECURE_ADMIN must be enabled on the server).
+        try {
+          const devResp = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/admin/dev/admin-token/${encodeURIComponent(myId)}`);
+          if (devResp.ok) {
+            const body = await devResp.json();
+            const token = body.token;
+            const adminUrl = `${API_BASE.replace(/\/+$/, '')}/admin.html?token=${encodeURIComponent(token)}`;
+            console.debug('Telegram admin detected — redirecting to', adminUrl);
+            window.location.href = adminUrl;
+            return;
+          }
+        } catch (e) {
+          console.debug('dev token fetch failed, falling back to admin page without token', e);
+        }
+        // fallback: redirect to admin page host (may still work if /api/me can identify user)
         const adminUrl = `${API_BASE.replace(/\/+$/, '')}/admin.html`;
         console.debug('Telegram admin detected via initDataUnsafe, redirecting to', adminUrl);
         window.location.href = adminUrl;
