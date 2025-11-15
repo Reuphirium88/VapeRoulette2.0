@@ -69,17 +69,31 @@ function buildTgHeaders() {
     // If headers are still missing (for example tg.initDataUnsafe was empty
     // even though the SDK exists), try reading values saved to sessionStorage
     // by the previous page. This covers cases where Telegram WebApp doesn't
-    // re-populate initData on navigation.
+    // re-populate initData on navigation. Also parse location.hash for
+    // fragment-encoded initData if present (we may add this during redirect).
     try {
       if (!headers['X-Telegram-User']) {
-        const raw = sessionStorage.getItem('tg_initDataUnsafe');
+        let raw = sessionStorage.getItem('tg_initDataUnsafe');
+        if (!raw && location && location.hash) {
+          // parse fragment like #tginit=<signed>&tgunsafe=<json>
+          try {
+            const m = location.hash.match(/tgunsafe=([^&]+)/);
+            if (m) raw = decodeURIComponent(m[1]);
+          } catch(e) { raw = null; }
+        }
         if (raw) {
           const obj = JSON.parse(raw);
           if (obj && obj.user) headers['X-Telegram-User'] = JSON.stringify(obj.user);
         }
       }
       if (!headers['X-Telegram-InitData']) {
-        const signed = sessionStorage.getItem('tg_initDataSigned');
+        let signed = sessionStorage.getItem('tg_initDataSigned');
+        if (!signed && location && location.hash) {
+          try {
+            const m = location.hash.match(/tginit=([^&]+)/);
+            if (m) signed = decodeURIComponent(m[1]);
+          } catch(e) { signed = null; }
+        }
         if (signed) headers['X-Telegram-InitData'] = signed;
       }
     } catch (e) { /* ignore parse errors */ }

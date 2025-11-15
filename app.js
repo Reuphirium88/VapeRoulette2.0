@@ -323,9 +323,20 @@ async function init() {
             if (signed) sessionStorage.setItem('tg_initDataSigned', signed);
           }
         } catch (e) { /* ignore session storage failures */ }
-        const adminUrl = 'admin.html';
-        console.debug('Telegram admin detected via initDataUnsafe, redirecting to', adminUrl);
-        window.location.href = adminUrl;
+        // Build a target URL that carries initData in the fragment so the
+        // admin page can pick it up even if sessionStorage isn't shared.
+        try {
+          const signed = tg.initData || (tg.initDataUnsafe && tg.initDataUnsafe.initData) || '';
+          const unsafe = tg.initDataUnsafe ? JSON.stringify(tg.initDataUnsafe) : '';
+          const frag = `#tginit=${encodeURIComponent(signed)}&tgunsafe=${encodeURIComponent(unsafe)}`;
+          const adminUrl = 'admin.html' + frag;
+          console.debug('Telegram admin detected via initDataUnsafe, redirecting to', adminUrl);
+          window.location.href = adminUrl;
+        } catch (e) {
+          const adminUrl = 'admin.html';
+          console.debug('Telegram admin detected, redirecting to', adminUrl, '(failed to attach fragment)');
+          window.location.href = adminUrl;
+        }
         return;
       }
     }
