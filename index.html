@@ -42,8 +42,8 @@
 
     <!-- Debug panel removed for production -->
 
-    <!-- Debug overlay (toggleable) -->
-    <div id="debug-overlay" style="position:fixed;right:12px;bottom:12px;z-index:9999;font-family:monospace;font-size:12px;">
+  <!-- Debug overlay (toggleable) -->
+  <div id="debug-overlay" style="display:none;position:fixed;right:12px;bottom:12px;z-index:9999;font-family:monospace;font-size:12px;">
       <button id="dbg-toggle" style="background:#222;color:#fff;border:0;padding:6px 8px;border-radius:4px;cursor:pointer;opacity:0.9">DBG</button>
       <div id="dbg-panel" style="display:none;background:rgba(0,0,0,0.85);color:#fff;padding:8px;border-radius:6px;margin-top:6px;max-width:420px;max-height:280px;overflow:auto;box-shadow:0 6px 18px rgba(0,0,0,0.5);">
   <div><strong>API_BASE:</strong> <span id="dbg-api">(unknown)</span> — App loaded: <strong id="dbg-apploaded">no</strong></div>
@@ -104,10 +104,12 @@
       document.body.appendChild(s);
     })();
   </script>
+  <script src="/debug-config.js"></script>
   <script>
     // Debug overlay updater
     (function(){
       try {
+        try { if (!window.API_DEBUG) return; } catch(e) { return; }
         const btn = document.getElementById('dbg-toggle');
         const panel = document.getElementById('dbg-panel');
         const apiEl = document.getElementById('dbg-api');
