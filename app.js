@@ -271,14 +271,16 @@ async function init() {
 
   try {
     currentUser = await fetchUser();
-    // If user is admin, open admin panel immediately and skip normal UI
+    // If user is admin, redirect to the dedicated admin page
     if (currentUser && currentUser.is_admin) {
       try {
-        showAdminPanel(currentUser);
+        // preserve debug: log and then redirect
+        console.debug('Admin detected, redirecting to admin.html');
+        window.location.href = (new URL('admin.html', window.location.href)).toString();
+        return;
       } catch (e) {
-        console.error('Failed to open admin panel', e);
+        console.error('Failed to redirect to admin panel', e);
       }
-      return;
     }
 
     lootboxes = await fetchLootboxes();

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin Panel — Loyalty Mini App</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>Admin Panel</h1>
+      <div id="admin-info">Checking identity...</div>
+    </header>
+
+    <section id="admin-users" class="admin-users">
+      <h2>Users</h2>
+      <div id="users-list">Loading users...</div>
+    </section>
+
+    <div id="toast" class="toast" hidden></div>
+  </main>
+
+  <script>
+    // allow overriding API base with ?api=...
+    (function(){
+      try{
+        const params = new URLSearchParams(location.search);
+        const api = params.get('api');
+        if(api) window.API_BASE_URL = api;
+      }catch(e){}
+    })();
+  </script>
+  <script src="admin.js"></script>
+</body>
+</html>
