@@ -31,6 +31,19 @@
       }catch(e){}
     })();
   </script>
-  <script src="/static/admin.js"></script>
+  <script>
+    // Load admin.js from /static when available; fall back to local admin.js for
+    // GitHub Pages or other static hosts.
+    (function(){
+      function load(src){
+        var s = document.createElement('script'); s.src = src; s.async = false; document.body.appendChild(s);
+      }
+      var primary = '/static/admin.js';
+      var fallback = 'admin.js';
+      var s = document.createElement('script'); s.src = primary; s.async = false;
+      s.onerror = function(){ load(fallback); };
+      document.body.appendChild(s);
+    })();
+  </script>
 </body>
 </html>

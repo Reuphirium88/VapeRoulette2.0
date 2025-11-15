@@ -55,6 +55,24 @@
       }catch(e){}
     })();
   </script>
-  <script src="/static/app.js"></script>
+  <script>
+    // Try to load /static/app.js (when served from the API/tunnel host).
+    // If that fails (e.g. GitHub Pages), fall back to relative ./app.js so the
+    // same HTML works both when hosted alongside the API and when served
+    // statically from GitHub Pages.
+    (function(){
+      function load(src){
+        var s = document.createElement('script');
+        s.src = src; s.async = false;
+        document.body.appendChild(s);
+      }
+      var primary = '/static/app.js';
+      var fallback = 'app.js';
+      var s = document.createElement('script');
+      s.src = primary; s.async = false;
+      s.onerror = function(){ load(fallback); };
+      document.body.appendChild(s);
+    })();
+  </script>
 </body>
 </html>
