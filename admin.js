@@ -112,7 +112,16 @@ async function initAdmin() {
     } else {
       document.getElementById('admin-info').textContent = `Signed in as admin: ${me.name}`;
     }
-    
+    // Debug: show raw /api/me response (masked token) for troubleshooting inside the WebApp.
+    try {
+      const dbg = document.createElement('div');
+      dbg.style.marginTop = '8px';
+      dbg.style.fontSize = '12px';
+      dbg.style.opacity = '0.9';
+      dbg.textContent = 'api/me: ' + JSON.stringify(Object.assign({}, me || {}, { admin_token: me && me.admin_token ? '[redacted]' : null }));
+      document.getElementById('admin-info').appendChild(dbg);
+    } catch (e) {}
+
     const users = await fetchAdminUsers(token);
     renderUsers(users, token);
   } catch (err) {
