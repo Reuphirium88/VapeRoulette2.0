@@ -1,0 +1,21 @@
+:root{--bg:#0f1724;--card:#0b1220;--accent:#7c3aed;--muted:#9ca3af;--glass:rgba(255,255,255,0.03)}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#071025 0%, #07182b 100%);color:#e6eef8;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.container{width:100%;max-width:820px;padding:24px}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.header h1{margin:0;font-size:20px}
+.xp{background:var(--glass);padding:8px 12px;border-radius:10px;color:var(--muted)}
+.lootboxes h2{margin:6px 0 12px;font-size:18px}
+.boxes{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.box{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
+.box h3{margin:0 0 8px;font-size:16px}
+.box .cost{color:var(--muted);margin-bottom:8px}
+.box .prizes{font-size:13px;color:var(--muted);margin-bottom:12px}
+.open-btn{background:var(--accent);color:#fff;border:none;padding:8px 10px;border-radius:8px;cursor:pointer}
+.open-btn:active{transform:translateY(1px)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:#111827;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.04)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center}
+.modal-card{background:var(--card);padding:18px;border-radius:12px;min-width:260px;text-align:center}
+.modal-card h3{margin-top:0}
+.modal-card button{margin-top:12px;padding:8px 12px;border-radius:8px;border:none;background:var(--accent);color:white}
+@media (max-width:420px){.container{padding:16px}.boxes{grid-template-columns:1fr}}
