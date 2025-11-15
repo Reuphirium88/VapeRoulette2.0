@@ -116,6 +116,29 @@ async function initAdmin() {
     const urlParams = new URLSearchParams(location.search);
     const tokenFromUrl = urlParams.get('token');
 
+    // Debug: show whether Telegram SDK/global is present before calling /api/me
+    try {
+      const dbgRoot = document.getElementById('admin-info');
+      const pre = document.createElement('div');
+      pre.style.marginTop = '6px';
+      pre.style.fontSize = '12px';
+      pre.style.opacity = '0.9';
+      const hasTelegram = !!(window.Telegram || window.Telegram && window.Telegram.WebApp);
+      let tgPreview = null;
+      try {
+        const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : (window.Telegram || null);
+        if (tg) {
+          tgPreview = {
+            hasInitData: Boolean(tg.initData || (tg.initDataUnsafe && tg.initDataUnsafe.initData)),
+            hasUser: Boolean(tg.initDataUnsafe && tg.initDataUnsafe.user),
+            userPreview: tg.initDataUnsafe && tg.initDataUnsafe.user ? { id: tg.initDataUnsafe.user.id, username: tg.initDataUnsafe.user.username } : null
+          };
+        }
+      } catch (e) { tgPreview = null }
+      pre.textContent = `telegram_present=${hasTelegram} tg_preview=${JSON.stringify(tgPreview)}`;
+      if (dbgRoot) dbgRoot.appendChild(pre);
+    } catch (e) { console.debug('dbg render fail', e) }
+
     const me = await apiMe().catch(()=>null);
 
     // Prefer explicit token in URL (developer convenience). Otherwise take token from /api/me
