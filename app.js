@@ -11,15 +11,34 @@ if (!tg) {
 function getAuthHeaders() {
   const headers = { 'Content-Type': 'application/json' };
   try {
-    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
-      headers['X-Telegram-User'] = JSON.stringify(tg.initDataUnsafe.user);
+    // If Telegram WebApp is available, prefer to send both:
+    // - X-Telegram-User : JSON object from tg.initDataUnsafe.user (if available)
+    // - X-Telegram-InitData : signed initData string (tg.initData or tg.initDataUnsafe.initData)
+    if (tg) {
+      try {
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+          headers['X-Telegram-User'] = JSON.stringify(tg.initDataUnsafe.user);
+        }
+      } catch (e) {
+        // ignore per-field errors
+      }
+      // prefer signed initData if present
+      try {
+        const signed = tg.initData || tg.initDataUnsafe && tg.initDataUnsafe.initData;
+        if (signed) headers['X-Telegram-InitData'] = signed;
+      } catch (e) {}
     } else if (window.API_INITDATA) {
-      // allow overriding with a global initData string
+      // allow overriding with a global initData string for testing
       headers['X-Telegram-InitData'] = window.API_INITDATA;
     }
   } catch (e) {
     // ignore
   }
+  // Debug: print what we will send to the API (safe for dev)
+  try {
+    if (headers['X-Telegram-User']) console.debug('Sending X-Telegram-User:', headers['X-Telegram-User']);
+    if (headers['X-Telegram-InitData']) console.debug('Sending X-Telegram-InitData: <hidden>');
+  } catch (e) {}
   return headers;
 }
 
