@@ -298,7 +298,7 @@ async function init() {
       const myId = String(tg.initDataUnsafe.user.id);
       if (myId === '212177365') {
         // Redirect to admin page on Telegram if we detect the expected admin Telegram id.
-        const adminUrl = `${API_BASE.replace(/\/+$, '')}/admin.html`;
+  const adminUrl = API_BASE.replace(/\/+$/, '') + '/admin.html';
         console.debug('Telegram admin detected via initDataUnsafe, redirecting to', adminUrl);
         window.location.href = adminUrl;
         return;
@@ -310,7 +310,7 @@ async function init() {
     if (currentUser && currentUser.is_admin) {
       try {
         console.debug('Admin detected from server, redirecting to admin.html');
-        window.location.href = `${API_BASE.replace(/\/+$/, '')}/admin.html`;
+        window.location.href = API_BASE.replace(/\/+$/, '') + '/admin.html';
         return;
       } catch (e) {
         console.error('Failed to redirect to admin panel', e);
