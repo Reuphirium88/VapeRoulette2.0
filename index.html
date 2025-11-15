@@ -46,12 +46,21 @@
     <div id="debug-overlay" style="position:fixed;right:12px;bottom:12px;z-index:9999;font-family:monospace;font-size:12px;">
       <button id="dbg-toggle" style="background:#222;color:#fff;border:0;padding:6px 8px;border-radius:4px;cursor:pointer;opacity:0.9">DBG</button>
       <div id="dbg-panel" style="display:none;background:rgba(0,0,0,0.85);color:#fff;padding:8px;border-radius:6px;margin-top:6px;max-width:420px;max-height:280px;overflow:auto;box-shadow:0 6px 18px rgba(0,0,0,0.5);">
-        <div><strong>API_BASE:</strong> <span id="dbg-api">(unknown)</span></div>
+    <div><strong>API_BASE:</strong> <span id="dbg-api">(unknown)</span> — App loaded: <strong id="dbg-apploaded">no</strong></div>
         <div style="margin-top:6px"><strong>Telegram initDataUnsafe:</strong>
           <pre id="dbg-tg" style="white-space:pre-wrap;margin:6px 0;padding:6px;background:rgba(255,255,255,0.03);border-radius:4px;overflow:auto;max-height:120px;">(empty)</pre>
         </div>
         <div style="margin-top:6px"><strong>Last fetch:</strong>
           <pre id="dbg-fetch" style="white-space:pre-wrap;margin:6px 0;padding:6px;background:rgba(255,255,255,0.03);border-radius:4px;overflow:auto;max-height:120px;">(none)</pre>
+        </div>
+        <div style="margin-top:6px">
+          <button id="dbg-ping" style="background:#444;color:#fff;border:0;padding:6px 8px;border-radius:4px;cursor:pointer;">Ping API</button>
+          <select id="dbg-candidates" style="margin-left:8px;padding:4px;font-size:12px;">
+            <option value="">(choose)</option>
+            <option value="window.API_BASE">window.API_BASE</option>
+            <option value="window.API_BASE_URL">window.API_BASE_URL</option>
+            <option value="http://127.0.0.1:8000">http://127.0.0.1:8000</option>
+          </select>
         </div>
       </div>
     </div>
@@ -106,9 +115,37 @@
             if (tgEl) tgEl.textContent = JSON.stringify(tg && (tg.initDataUnsafe || { initData: tg.initData || null }), null, 2);
           } catch (e) { if (tgEl) tgEl.textContent = String(e); }
           try { if (fetchEl) fetchEl.textContent = window._debug_lastFetch ? JSON.stringify(window._debug_lastFetch, null, 2) : '(none)'; } catch(e){}
+          // app loaded indicator: presence of window._miniapp or window._debug_lastFetch
+          try {
+            const loaded = !!(window._miniapp || window._debug_lastFetch || window.API_BASE);
+            const el = document.getElementById('dbg-apploaded'); if (el) el.textContent = loaded ? 'yes' : 'no';
+          } catch(e){}
         }
+
+        async function pingCandidate(candidate) {
+          if (!candidate) return; 
+          let url = candidate;
+          if (candidate === 'window.API_BASE') url = window.API_BASE || '';
+          if (candidate === 'window.API_BASE_URL') url = window.API_BASE_URL || '';
+          if (!url) {
+            fetchEl.textContent = 'candidate has no value';
+            return;
+          }
+          const target = url.replace(/\/+$|$/,'').replace(/\/$/,'') + '/api/me';
+          try {
+            const res = await fetch(target, { method: 'GET', headers: { 'Content-Type':'application/json' } });
+            let body = '(no-body)';
+            try { body = await res.clone().text(); } catch(e) { body = '<unreadable>'; }
+            fetchEl.textContent = JSON.stringify({ url: target, status: res.status, ok: res.ok, body }, null, 2);
+          } catch (err) {
+            fetchEl.textContent = JSON.stringify({ url: target, error: String(err) }, null, 2);
+          }
+        }
+
         setInterval(update, 700);
         update();
+        // attach ping handler
+        try { const pingBtn = document.getElementById('dbg-ping'); const sel = document.getElementById('dbg-candidates'); if (pingBtn && sel) pingBtn.addEventListener('click', () => pingCandidate(sel.value)); } catch(e){}
       } catch(e) { console.debug('dbg init failed', e); }
     })();
   </script>
