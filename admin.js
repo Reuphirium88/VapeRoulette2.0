@@ -1,6 +1,28 @@
 // Lightweight admin UI for Loyalty Mini App
 const API_BASE = window.API_BASE_URL || 'https://grotesquely-pleasing-reedbuck.cloudpub.ru/';
 
+// Debug: wrap global fetch to capture last fetch details for the debug overlay
+(function(){
+  try {
+    if (typeof window === 'undefined' || !window.fetch) return;
+    const _origFetch = window.fetch.bind(window);
+    window._debug_lastFetch = null;
+    window.fetch = async function(url, opts){
+      const start = Date.now();
+      try {
+        const res = await _origFetch(url, opts);
+        let bodyText = null;
+        try { bodyText = await res.clone().text(); } catch(e){ bodyText = '<non-text or unreadable>'; }
+        window._debug_lastFetch = { url: String(url), headers: opts && opts.headers ? Object.keys(opts.headers) : [], status: res.status, ok: res.ok, body: bodyText, duration_ms: Date.now()-start };
+        return res;
+      } catch (err) {
+        window._debug_lastFetch = { url: String(url), headers: opts && opts.headers ? Object.keys(opts.headers) : [], error: String(err), duration_ms: Date.now()-start };
+        throw err;
+      }
+    };
+  } catch(e) { /* ignore */ }
+})();
+
 function showToast(text, ms = 3500) {
   const t = document.getElementById('toast');
   if (!t) return console.log(text);

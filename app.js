@@ -7,6 +7,28 @@ if (!tg) {
   console.log('Telegram.WebApp not found — running in fallback mode.');
 }
 
+// Debug: wrap global fetch to capture last fetch details for the debug overlay
+(function(){
+  try {
+    if (typeof window === 'undefined' || !window.fetch) return;
+    const _origFetch = window.fetch.bind(window);
+    window._debug_lastFetch = null;
+    window.fetch = async function(url, opts){
+      const start = Date.now();
+      try {
+        const res = await _origFetch(url, opts);
+        let bodyText = null;
+        try { bodyText = await res.clone().text(); } catch(e){ bodyText = '<non-text or unreadable>'; }
+        window._debug_lastFetch = { url: String(url), headers: opts && opts.headers ? Object.keys(opts.headers) : [], status: res.status, ok: res.ok, body: bodyText, duration_ms: Date.now()-start };
+        return res;
+      } catch (err) {
+        window._debug_lastFetch = { url: String(url), headers: opts && opts.headers ? Object.keys(opts.headers) : [], error: String(err), duration_ms: Date.now()-start };
+        throw err;
+      }
+    };
+  } catch(e) { /* ignore */ }
+})();
+
 // helper to attach Telegram user data to requests
 function getAuthHeaders() {
   const headers = { 'Content-Type': 'application/json' };
