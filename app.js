@@ -95,11 +95,27 @@ async function fetchUser() {
     console.error('fetchUser error', err);
     // show richer debug inside the WebApp because console may be unavailable
     showDebug({ phase: 'fetchUser', apiBase: API_BASE, tg: safeTgInfo(), headers: Object.keys(getAuthHeaders()), error: (err && err.message) || String(err) });
-    if (!tg) {
-      showToast('API unavailable — running with mock data');
+    // Fallback: if Telegram WebApp is available, try construct user from tg.initDataUnsafe.user
+    if (tg) {
+      try {
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+          const u = tg.initDataUnsafe.user;
+          const user = {
+            id: u.id || 0,
+            username: u.username || null,
+            full_name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.username || 'Telegram User',
+            xp_balance: 0
+          };
+          showToast('Using Telegram-provided user data (offline mode)');
+          return user;
+        }
+      } catch(e) { /* ignore */ }
+      showToast('API unavailable — running in offline demo mode');
       return BROWSER_MOCK_USER;
     }
-    throw err;
+    // Non-Telegram fallback
+    showToast('API unavailable — running with mock data');
+    return BROWSER_MOCK_USER;
   }
 }
 
@@ -127,13 +143,13 @@ async function fetchLootboxes() {
   } catch (err) {
     console.error('fetchLootboxes error', err);
     showDebug({ phase: 'fetchLootboxes', apiBase: API_BASE, tg: safeTgInfo(), headers: Object.keys(getAuthHeaders()), error: (err && err.message) || String(err) });
-    if (!tg) {
-      showToast('Could not load lootboxes — showing demo boxes');
-      return [
-        { id: 'lb-demo-1', name: 'Demo Box A', cost_xp: 100, prize_preview: ['Sample A', 'Sample B'] }
-      ];
-    }
-    throw err;
+    // Always fallback to demo boxes when API fails so the UI remains usable inside Telegram
+    showToast('Could not load lootboxes — showing demo boxes');
+    return [
+      { id: 'lb-demo-1', name: 'Bronze Box', cost_xp: 200, prize_preview: ['Small Coil', 'Sticker', '5% off'] },
+      { id: 'lb-demo-2', name: 'Silver Box', cost_xp: 500, prize_preview: ['Pod', 'E-liquid 10ml', '10% off'] },
+      { id: 'lb-demo-3', name: 'Gold Box', cost_xp: 1000, prize_preview: ['Battery', 'E-liquid 50ml', '20% off'] }
+    ];
   }
 }
 
