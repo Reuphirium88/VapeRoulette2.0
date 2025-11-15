@@ -122,8 +122,30 @@ async function initAdmin() {
       document.getElementById('admin-info').appendChild(dbg);
     } catch (e) {}
 
-    const users = await fetchAdminUsers(token);
-    renderUsers(users, token);
+    // If we don't have a token but are inside Telegram, try the dev helper endpoint
+    let finalToken = token;
+    if (!finalToken) {
+      try {
+        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+          const tg = window.Telegram.WebApp.initDataUnsafe.user;
+          const devRes = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/admin/dev/admin-token/${encodeURIComponent(tg.id)}`);
+          if (devRes.ok) {
+            const devBody = await devRes.json();
+            finalToken = devBody.token;
+          }
+        }
+      } catch (e) {
+        console.debug('dev token fetch failed', e);
+      }
+    }
+
+    if (!finalToken) {
+      document.getElementById('users-list').innerHTML = '<p>No admin token available.</p>';
+      return;
+    }
+
+    const users = await fetchAdminUsers(finalToken);
+    renderUsers(users, finalToken);
   } catch (err) {
     console.error('Admin init failed', err);
     document.getElementById('admin-info').textContent = 'Failed to initialize admin panel.';
