@@ -1,26 +1,28 @@
-// Minimal frontend for Loyalty Mini App (mocked data + Telegram WebApp guard)
+// Frontend for Loyalty Mini App — supports Telegram.WebApp and a normal-browser fallback.
 
-// Telegram guard / lightweight mock so app works in normal browser
-if (!window.Telegram || !window.Telegram.WebApp) {
-  window.Telegram = window.Telegram || {};
-  window.Telegram.WebApp = {
-    initData: '',
-    isExpanded: false,
-    ready: function() {},
-    close: function() { console.log('WebApp.close() mock'); },
-    onEvent: function() {},
-    MainButton: {
-      show: function() {},
-      hide: function() {},
-      setText: function() {}
-    }
-  };
-  console.log('Telegram.WebApp not found — using mock.');
+// detect Telegram.WebApp presence
+const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+
+if (!tg) {
+  console.log('Telegram.WebApp not found — running in fallback mode.');
 }
 
-const tg = window.Telegram.WebApp;
+// helper to attach Telegram user data to requests
+function getAuthHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+  try {
+    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+      headers['X-Telegram-User'] = JSON.stringify(tg.initDataUnsafe.user);
+    } else if (window.API_INITDATA) {
+      // allow overriding with a global initData string
+      headers['X-Telegram-InitData'] = window.API_INITDATA;
+    }
+  } catch (e) {
+    // ignore
+  }
+  return headers;
+}
 
-// Simple helper to show toast
 function showToast(text, ms = 2500) {
   const t = document.getElementById('toast');
   t.textContent = text;
@@ -28,38 +30,54 @@ function showToast(text, ms = 2500) {
   setTimeout(() => t.hidden = true, ms);
 }
 
-// Mocked loadUser — would call backend later
-export function loadUser() {
-  // test user
-  return Promise.resolve({ id: 1, name: 'DemoUser', xp: 1250 });
+const API_BASE = window.API_BASE_URL || '';
+
+export async function loadUser() {
+  if (!API_BASE) {
+    return { id: 1, name: 'DemoUser', xp: 1250 };
+  }
+  const res = await fetch(`${API_BASE}/api/me`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error('Failed to load user');
+  return res.json();
 }
 
-// Mocked lootboxes
-export function loadLootboxes() {
-  const boxes = [
-    { id: 'lb-200', cost: 200, title: 'Bronze Box', prizes: ['Small Coil', 'Sticker', '5% off'] },
-    { id: 'lb-500', cost: 500, title: 'Silver Box', prizes: ['Pod', 'E-liquid 10ml', '10% off'] },
-    { id: 'lb-1000', cost: 1000, title: 'Gold Box', prizes: ['Battery', 'E-liquid 50ml', '20% off'] },
-    { id: 'lb-5000', cost: 5000, title: 'Platinum Box', prizes: ['Device', 'Premium Kit', 'Full Refund Coupon'] }
-  ];
-  return Promise.resolve(boxes);
+export async function loadLootboxes() {
+  if (!API_BASE) {
+    return [
+      { id: 'lb-200', cost: 200, title: 'Bronze Box', prizes: ['Small Coil', 'Sticker', '5% off'] },
+      { id: 'lb-500', cost: 500, title: 'Silver Box', prizes: ['Pod', 'E-liquid 10ml', '10% off'] },
+      { id: 'lb-1000', cost: 1000, title: 'Gold Box', prizes: ['Battery', 'E-liquid 50ml', '20% off'] },
+      { id: 'lb-5000', cost: 5000, title: 'Platinum Box', prizes: ['Device', 'Premium Kit', 'Full Refund Coupon'] }
+    ];
+  }
+  const res = await fetch(`${API_BASE}/api/lootboxes`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error('Failed to load lootboxes');
+  return res.json();
 }
 
-// Simulate opening a lootbox
-export function openLootbox(box, user) {
-  return new Promise((resolve, reject) => {
-    if (user.xp < box.cost) {
-      reject(new Error('Not enough XP'));
-      return;
-    }
-    // simulate server delay
-    setTimeout(() => {
-      const prize = box.prizes[Math.floor(Math.random() * box.prizes.length)];
-      // deduct xp locally (backend will validate later)
-      user.xp -= box.cost;
-      resolve({ prize, remainingXp: user.xp });
-    }, 800);
+export async function openLootbox(box, user) {
+  if (!API_BASE) {
+    // local simulation
+    return new Promise((resolve, reject) => {
+      if (user.xp < box.cost) return reject(new Error('Not enough XP'));
+      setTimeout(() => {
+        const prize = box.prizes[Math.floor(Math.random() * box.prizes.length)];
+        user.xp -= box.cost;
+        resolve({ prize, remainingXp: user.xp });
+      }, 500);
+    });
+  }
+
+  const res = await fetch(`${API_BASE}/api/lootboxes/${encodeURIComponent(box.id)}/open`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
   });
+  if (res.status === 400) {
+    const body = await res.json();
+    throw new Error(body.detail || 'Open failed');
+  }
+  if (!res.ok) throw new Error('Open failed');
+  return res.json();
 }
 
 // UI wiring
@@ -96,6 +114,8 @@ function renderLootboxes(boxes) {
       if (!box) return;
       try {
         const result = await openLootbox(box, currentUser);
+        // if server returned remaining_xp, respect it
+        if (result.remaining_xp !== undefined) currentUser.xp = result.remaining_xp;
         renderUser(currentUser);
         showModal(`You won: ${result.prize}`);
       } catch (err) {
@@ -117,8 +137,11 @@ function hideModal() {
 
 // initialize app
 async function init() {
-  // Telegram API ready (if real Telegram present)
-  if (tg && typeof tg.ready === 'function') tg.ready();
+  try {
+    if (tg && typeof tg.ready === 'function') tg.ready();
+  } catch (e) {
+    // ignore
+  }
 
   currentUser = await loadUser();
   lootboxes = await loadLootboxes();
@@ -132,5 +155,5 @@ async function init() {
 // Start
 init().catch(err => console.error(err));
 
-// For quick debugging in console
+// Debug helper
 window._miniapp = { loadUser, loadLootboxes, openLootbox };
