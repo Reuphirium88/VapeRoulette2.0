@@ -53,6 +53,20 @@ function getAuthHeaders() {
       // allow overriding with a global initData string for testing
       headers['X-Telegram-InitData'] = window.API_INITDATA;
     }
+    // If Telegram SDK didn't provide user/initData (e.g. after navigation), try sessionStorage
+    try {
+      if (!headers['X-Telegram-User']) {
+        const raw = sessionStorage.getItem('tg_initDataUnsafe');
+        if (raw) {
+          const obj = JSON.parse(raw);
+          if (obj && obj.user) headers['X-Telegram-User'] = JSON.stringify(obj.user);
+        }
+      }
+      if (!headers['X-Telegram-InitData']) {
+        const signed = sessionStorage.getItem('tg_initDataSigned');
+        if (signed) headers['X-Telegram-InitData'] = signed;
+      }
+    } catch (e) { /* ignore */ }
   } catch (e) {
     // ignore
   }
@@ -297,7 +311,18 @@ async function init() {
     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
       const myId = String(tg.initDataUnsafe.user.id);
       if (myId === '212177365') {
-        // Redirect to local admin page (relative) so Telegram WebApp initDataUnsafe is preserved.
+        // Before navigating, persist Telegram initDataUnsafe into sessionStorage so
+        // subsequent pages (admin.html) can pick it up if the WebApp SDK doesn't
+        // re-populate initDataUnsafe on navigation.
+        try {
+          if (tg && tg.initDataUnsafe) {
+            sessionStorage.setItem('tg_initDataUnsafe', JSON.stringify(tg.initDataUnsafe));
+          }
+          if (tg) {
+            const signed = tg.initData || (tg.initDataUnsafe && tg.initDataUnsafe.initData);
+            if (signed) sessionStorage.setItem('tg_initDataSigned', signed);
+          }
+        } catch (e) { /* ignore session storage failures */ }
         const adminUrl = 'admin.html';
         console.debug('Telegram admin detected via initDataUnsafe, redirecting to', adminUrl);
         window.location.href = adminUrl;
@@ -310,6 +335,12 @@ async function init() {
     if (currentUser && currentUser.is_admin) {
       try {
         console.debug('Admin detected from server, redirecting to admin.html');
+        try {
+          // Persist any available initData to sessionStorage so admin page can use it
+          if (tg && tg.initDataUnsafe) sessionStorage.setItem('tg_initDataUnsafe', JSON.stringify(tg.initDataUnsafe));
+          const signed = tg && (tg.initData || (tg.initDataUnsafe && tg.initDataUnsafe.initData));
+          if (signed) sessionStorage.setItem('tg_initDataSigned', signed);
+        } catch (e) {}
         // Use relative redirect to keep Telegram WebApp context when possible
         window.location.href = 'admin.html';
         return;

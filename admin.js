@@ -57,6 +57,7 @@ async function waitForTgInit(timeout = 1500, interval = 100) {
 function buildTgHeaders() {
   const headers = { 'Content-Type': 'application/json' };
   try {
+    // Prefer live Telegram SDK if available
     if (window.Telegram && window.Telegram.WebApp) {
       const tg = window.Telegram.WebApp;
       if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
@@ -64,6 +65,17 @@ function buildTgHeaders() {
       }
       const signed = tg.initData || (tg.initDataUnsafe && tg.initDataUnsafe.initData);
       if (signed) headers['X-Telegram-InitData'] = signed;
+    } else {
+      // Fallback: read from sessionStorage where the previous page may have stored initData
+      try {
+        const raw = sessionStorage.getItem('tg_initDataUnsafe');
+        if (raw) {
+          const obj = JSON.parse(raw);
+          if (obj && obj.user) headers['X-Telegram-User'] = JSON.stringify(obj.user);
+        }
+        const signed = sessionStorage.getItem('tg_initDataSigned');
+        if (signed) headers['X-Telegram-InitData'] = signed;
+      } catch (e) { /* ignore parse errors */ }
     }
   } catch (e) {}
   return headers;
