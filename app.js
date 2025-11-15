@@ -50,20 +50,6 @@ function showToast(text, ms = 3500) {
   setTimeout(() => t.hidden = true, ms);
 }
 
-function showDebug(obj) {
-  try {
-    const panel = document.getElementById('debug-panel');
-    const content = document.getElementById('debug-content');
-    if (!panel || !content) return;
-    content.textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
-    panel.hidden = false;
-  } catch (e) { console.error(e); }
-}
-
-function hideDebug() {
-  const panel = document.getElementById('debug-panel');
-  if (panel) panel.hidden = true;
-}
 
 const API_BASE = window.API_BASE_URL || 'https://grotesquely-pleasing-reedbuck.cloudpub.ru/';
 
@@ -93,8 +79,8 @@ async function fetchUser() {
     return data;
   } catch (err) {
     console.error('fetchUser error', err);
-    // show richer debug inside the WebApp because console may be unavailable
-    showDebug({ phase: 'fetchUser', apiBase: API_BASE, tg: safeTgInfo(), headers: Object.keys(getAuthHeaders()), error: (err && err.message) || String(err) });
+  // (debug panel removed) log error to console
+  console.debug('fetchUser debug:', { phase: 'fetchUser', apiBase: API_BASE, tg: safeTgInfo(), headers: Object.keys(getAuthHeaders()), error: (err && err.message) || String(err) });
     // Fallback: if Telegram WebApp is available, try construct user from tg.initDataUnsafe.user
     if (tg) {
       try {
@@ -142,7 +128,7 @@ async function fetchLootboxes() {
     return data;
   } catch (err) {
     console.error('fetchLootboxes error', err);
-    showDebug({ phase: 'fetchLootboxes', apiBase: API_BASE, tg: safeTgInfo(), headers: Object.keys(getAuthHeaders()), error: (err && err.message) || String(err) });
+  console.debug('fetchLootboxes debug:', { phase: 'fetchLootboxes', apiBase: API_BASE, tg: safeTgInfo(), headers: Object.keys(getAuthHeaders()), error: (err && err.message) || String(err) });
     // Always fallback to demo boxes when API fails so the UI remains usable inside Telegram
     showToast('Could not load lootboxes — showing demo boxes');
     return [
@@ -318,7 +304,5 @@ window._miniapp = { fetchUser, fetchLootboxes, openLootbox };
     // close when clicking on the overlay (outside the modal card)
     if (e.target === modal) hideModal();
   });
-  // debug panel close
-  const debugClose = document.getElementById('debug-close');
-  if (debugClose) debugClose.addEventListener('click', hideDebug);
+  // debug panel removed
 })();
