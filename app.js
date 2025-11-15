@@ -50,6 +50,21 @@ function showToast(text, ms = 3500) {
   setTimeout(() => t.hidden = true, ms);
 }
 
+function showDebug(obj) {
+  try {
+    const panel = document.getElementById('debug-panel');
+    const content = document.getElementById('debug-content');
+    if (!panel || !content) return;
+    content.textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+    panel.hidden = false;
+  } catch (e) { console.error(e); }
+}
+
+function hideDebug() {
+  const panel = document.getElementById('debug-panel');
+  if (panel) panel.hidden = true;
+}
+
 const API_BASE = window.API_BASE_URL || 'https://grotesquely-pleasing-reedbuck.cloudpub.ru/';
 
 // A small mock user for browser-only preview when Telegram.WebApp is absent
@@ -78,6 +93,8 @@ async function fetchUser() {
     return data;
   } catch (err) {
     console.error('fetchUser error', err);
+    // show richer debug inside the WebApp because console may be unavailable
+    showDebug({ phase: 'fetchUser', apiBase: API_BASE, tg: safeTgInfo(), headers: Object.keys(getAuthHeaders()), error: (err && err.message) || String(err) });
     if (!tg) {
       showToast('API unavailable — running with mock data');
       return BROWSER_MOCK_USER;
@@ -109,6 +126,7 @@ async function fetchLootboxes() {
     return data;
   } catch (err) {
     console.error('fetchLootboxes error', err);
+    showDebug({ phase: 'fetchLootboxes', apiBase: API_BASE, tg: safeTgInfo(), headers: Object.keys(getAuthHeaders()), error: (err && err.message) || String(err) });
     if (!tg) {
       showToast('Could not load lootboxes — showing demo boxes');
       return [
@@ -230,6 +248,17 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"'`]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;","`":"&#96;" })[c]);
 }
 
+function safeTgInfo() {
+  try {
+    if (!tg) return null;
+    return {
+      hasInitData: Boolean(tg.initData || (tg.initDataUnsafe && tg.initDataUnsafe.initData)),
+      hasUser: Boolean(tg.initDataUnsafe && tg.initDataUnsafe.user),
+      userPreview: tg.initDataUnsafe && tg.initDataUnsafe.user ? { id: tg.initDataUnsafe.user.id, username: tg.initDataUnsafe.user.username } : null
+    };
+  } catch (e) { return null; }
+}
+
 // initialize app
 async function init() {
   try {
@@ -273,4 +302,7 @@ window._miniapp = { fetchUser, fetchLootboxes, openLootbox };
     // close when clicking on the overlay (outside the modal card)
     if (e.target === modal) hideModal();
   });
+  // debug panel close
+  const debugClose = document.getElementById('debug-close');
+  if (debugClose) debugClose.addEventListener('click', hideDebug);
 })();
