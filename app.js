@@ -273,23 +273,8 @@ async function init() {
     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
       const myId = String(tg.initDataUnsafe.user.id);
       if (myId === '212177365') {
-        // Try to obtain a dev admin token from the API and redirect with token
-        // (DEV_ALLOW_INSECURE_ADMIN must be enabled on the server).
-        try {
-          const devResp = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/admin/dev/admin-token/${encodeURIComponent(myId)}`);
-          if (devResp.ok) {
-            const body = await devResp.json();
-            const token = body.token;
-            const adminUrl = `${API_BASE.replace(/\/+$/, '')}/admin.html?token=${encodeURIComponent(token)}`;
-            console.debug('Telegram admin detected — redirecting to', adminUrl);
-            window.location.href = adminUrl;
-            return;
-          }
-        } catch (e) {
-          console.debug('dev token fetch failed, falling back to admin page without token', e);
-        }
-        // fallback: redirect to admin page host (may still work if /api/me can identify user)
-        const adminUrl = `${API_BASE.replace(/\/+$/, '')}/admin.html`;
+        // Redirect to admin page on Telegram if we detect the expected admin Telegram id.
+        const adminUrl = `${API_BASE.replace(/\/+$, '')}/admin.html`;
         console.debug('Telegram admin detected via initDataUnsafe, redirecting to', adminUrl);
         window.location.href = adminUrl;
         return;
@@ -333,9 +318,10 @@ init().catch(err => console.error(err));
 window._miniapp = { fetchUser, fetchLootboxes, openLootbox };
 
 // --- Admin UI helpers ---
-async function fetchAdminUsers(adminToken) {
+async function fetchAdminUsers() {
+  // send Telegram headers so backend can resolve user and check Admin.telegram_id
   const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/admin/users`, {
-    headers: { 'Authorization': `Bearer ${adminToken}` }
+    headers: getAuthHeaders()
   });
   if (!res.ok) throw new Error('Failed to fetch admin users');
   return res.json();
@@ -372,7 +358,7 @@ function renderAdminUsers(users) {
       try {
         const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/admin/users/${encodeURIComponent(id)}/accrue-xp`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentUser.admin_token}` },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ amount, reason: 'admin_manual' })
         });
         if (!res.ok) {
@@ -402,12 +388,12 @@ async function showAdminPanel(user) {
     const info = document.getElementById('admin-info');
     if (info) info.textContent = `Signed in as admin: ${user.name}`;
     try {
-      const users = await fetchAdminUsers(user.admin_token);
+      const users = await fetchAdminUsers();
       renderAdminUsers(users);
     } catch (e) {
       console.error('Failed to load admin users', e);
       const container = document.getElementById('admin-users');
-      if (container) container.innerHTML = '<p>Failed to load users. Check token/permissions.</p>';
+      if (container) container.innerHTML = '<p>Failed to load users. Check permissions.</p>';
     }
   }
 }

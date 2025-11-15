@@ -14,29 +14,23 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"'`]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;","`":"&#96;" })[c]);
 }
 
-async function apiMe() {
-  // Wait briefly for Telegram WebApp SDK to populate initDataUnsafe (race condition
-  // inside the WebView). Poll for up to 1500ms before giving up.
-  async function waitForTgInit(timeout = 1500, interval = 100) {
-    const start = Date.now();
-    while (Date.now() - start < timeout) {
-      try {
-        if (window.Telegram && window.Telegram.WebApp) {
-          const tg = window.Telegram.WebApp;
-          // call ready() if available to encourage SDK to finish init
-          try { if (typeof tg.ready === 'function') tg.ready(); } catch (e) {}
-          if ((tg.initDataUnsafe && tg.initDataUnsafe.user) || tg.initData) return true;
-        }
-      } catch (e) {}
-      await new Promise(r => setTimeout(r, interval));
-    }
-    return false;
+// Small helper: wait for Telegram SDK/init to appear (race inside WebView)
+async function waitForTgInit(timeout = 1500, interval = 100) {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    try {
+      if (window.Telegram && window.Telegram.WebApp) {
+        const tg = window.Telegram.WebApp;
+        try { if (typeof tg.ready === 'function') tg.ready(); } catch (e) {}
+        if ((tg.initDataUnsafe && tg.initDataUnsafe.user) || tg.initData) return true;
+      }
+    } catch (e) {}
+    await new Promise(r => setTimeout(r, interval));
   }
+  return false;
+}
 
-  await waitForTgInit(1500, 100);
-
-  // Build headers that include Telegram WebApp user/initData if available so backend
-  // can identify the user inside the WebApp.
+function buildTgHeaders() {
   const headers = { 'Content-Type': 'application/json' };
   try {
     if (window.Telegram && window.Telegram.WebApp) {
@@ -48,15 +42,14 @@ async function apiMe() {
       if (signed) headers['X-Telegram-InitData'] = signed;
     }
   } catch (e) {}
-
-  const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/me`, { headers });
-  if (!res.ok) throw new Error('Failed to fetch /api/me');
-  return res.json();
+  return headers;
 }
 
-async function fetchAdminUsers(token) {
+async function fetchAdminUsers() {
+  // ensure Telegram init data (best-effort)
+  await waitForTgInit(1500, 100);
   const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/admin/users`, {
-    headers: { 'Authorization': `Bearer ${token}` }
+    headers: buildTgHeaders()
   });
   if (!res.ok) throw new Error('Failed to fetch admin users');
   return res.json();
@@ -90,9 +83,10 @@ function renderUsers(users, token) {
       const id = e.currentTarget.dataset.id;
       const amount = 100;
       try {
+        await waitForTgInit(1500, 100);
         const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/admin/users/${encodeURIComponent(id)}/accrue-xp`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          headers: Object.assign({}, buildTgHeaders()),
           body: JSON.stringify({ amount, reason: 'admin_manual' })
         });
         if (!res.ok) {
@@ -113,10 +107,7 @@ function renderUsers(users, token) {
 
 async function initAdmin() {
   try {
-    const urlParams = new URLSearchParams(location.search);
-    const tokenFromUrl = urlParams.get('token');
-
-    // Debug: show whether Telegram SDK/global is present before calling /api/me
+  // Debug: show whether Telegram SDK/global is present before calling /api/me
     try {
       const dbgRoot = document.getElementById('admin-info');
       const pre = document.createElement('div');
@@ -139,56 +130,15 @@ async function initAdmin() {
       if (dbgRoot) dbgRoot.appendChild(pre);
     } catch (e) { console.debug('dbg render fail', e) }
 
-    const me = await apiMe().catch(()=>null);
-
-    // Prefer explicit token in URL (developer convenience). Otherwise take token from /api/me
-    const token = tokenFromUrl || (me && me.admin_token);
-
-    if (!me || !me.is_admin) {
-      // If /api/me didn't identify the user as admin but a token was provided via URL,
-      // allow proceeding (useful for local dev when headers/initData aren't forwarded).
-      if (!token) {
-        document.getElementById('admin-info').textContent = 'You are not an admin or authentication failed.';
-        return;
-      }
-      document.getElementById('admin-info').textContent = `Signed in as admin (token provided)`;
-    } else {
-      document.getElementById('admin-info').textContent = `Signed in as admin: ${me.name}`;
-    }
-    // Debug: show raw /api/me response (masked token) for troubleshooting inside the WebApp.
-    try {
-      const dbg = document.createElement('div');
-      dbg.style.marginTop = '8px';
-      dbg.style.fontSize = '12px';
-      dbg.style.opacity = '0.9';
-      dbg.textContent = 'api/me: ' + JSON.stringify(Object.assign({}, me || {}, { admin_token: me && me.admin_token ? '[redacted]' : null }));
-      document.getElementById('admin-info').appendChild(dbg);
-    } catch (e) {}
-
-    // If we don't have a token but are inside Telegram, try the dev helper endpoint
-    let finalToken = token;
-    if (!finalToken) {
-      try {
-        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
-          const tg = window.Telegram.WebApp.initDataUnsafe.user;
-          const devRes = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/admin/dev/admin-token/${encodeURIComponent(tg.id)}`);
-          if (devRes.ok) {
-            const devBody = await devRes.json();
-            finalToken = devBody.token;
-          }
-        }
-      } catch (e) {
-        console.debug('dev token fetch failed', e);
-      }
-    }
-
-    if (!finalToken) {
-      document.getElementById('users-list').innerHTML = '<p>No admin token available.</p>';
+    // Instead of token-based flow, ask backend for admin users using Telegram headers.
+    const users = await fetchAdminUsers().catch(()=>null);
+    if (!users) {
+      document.getElementById('admin-info').textContent = 'You are not an admin or authentication failed.';
+      document.getElementById('users-list').innerHTML = '<p>Admin access not available.</p>';
       return;
     }
-
-    const users = await fetchAdminUsers(finalToken);
-    renderUsers(users, finalToken);
+    document.getElementById('admin-info').textContent = `Signed in as admin`;
+    renderUsers(users);
   } catch (err) {
     console.error('Admin init failed', err);
     document.getElementById('admin-info').textContent = 'Failed to initialize admin panel.';
