@@ -65,18 +65,24 @@ function buildTgHeaders() {
       }
       const signed = tg.initData || (tg.initDataUnsafe && tg.initDataUnsafe.initData);
       if (signed) headers['X-Telegram-InitData'] = signed;
-    } else {
-      // Fallback: read from sessionStorage where the previous page may have stored initData
-      try {
+    }
+    // If headers are still missing (for example tg.initDataUnsafe was empty
+    // even though the SDK exists), try reading values saved to sessionStorage
+    // by the previous page. This covers cases where Telegram WebApp doesn't
+    // re-populate initData on navigation.
+    try {
+      if (!headers['X-Telegram-User']) {
         const raw = sessionStorage.getItem('tg_initDataUnsafe');
         if (raw) {
           const obj = JSON.parse(raw);
           if (obj && obj.user) headers['X-Telegram-User'] = JSON.stringify(obj.user);
         }
+      }
+      if (!headers['X-Telegram-InitData']) {
         const signed = sessionStorage.getItem('tg_initDataSigned');
         if (signed) headers['X-Telegram-InitData'] = signed;
-      } catch (e) { /* ignore parse errors */ }
-    }
+      }
+    } catch (e) { /* ignore parse errors */ }
   } catch (e) {}
   return headers;
 }
