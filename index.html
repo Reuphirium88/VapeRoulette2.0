@@ -54,6 +54,12 @@
         <div style="margin-top:6px"><strong>Last fetch:</strong>
           <pre id="dbg-fetch" style="white-space:pre-wrap;margin:6px 0;padding:6px;background:rgba(255,255,255,0.03);border-radius:4px;overflow:auto;max-height:120px;">(none)</pre>
         </div>
+          <div style="margin-top:6px"><strong>App errors:</strong>
+            <pre id="dbg-errors" style="white-space:pre-wrap;margin:6px 0;padding:6px;background:rgba(255,0,0,0.05);border-radius:4px;overflow:auto;max-height:120px;color:#ffc7c7">(none)</pre>
+          </div>
+          <div style="margin-top:6px">
+            <button id="dbg-runinit" style="background:#2a7;padding:6px 8px;border:0;border-radius:4px;color:#000;cursor:pointer">Run init</button>
+          </div>
         <div style="margin-top:6px">
           <button id="dbg-ping" style="background:#444;color:#fff;border:0;padding:6px 8px;border-radius:4px;cursor:pointer;">Ping API</button>
           <select id="dbg-candidates" style="margin-left:8px;padding:4px;font-size:12px;">
@@ -147,6 +153,42 @@
         update();
         // attach ping handler
         try { const pingBtn = document.getElementById('dbg-ping'); const sel = document.getElementById('dbg-candidates'); if (pingBtn && sel) pingBtn.addEventListener('click', () => pingCandidate(sel.value)); } catch(e){}
+
+        // capture global errors for the overlay
+        try {
+          window._debug_appErrors = window._debug_appErrors || [];
+          window.onerror = function(message, source, lineno, colno, error) {
+            try { window._debug_appErrors.push(String(message) + ' @ ' + source + ':' + lineno + ':' + colno); } catch(e){}
+            return false;
+          };
+          window.addEventListener('unhandledrejection', function(ev){
+            try { window._debug_appErrors.push('unhandledrejection: ' + (ev.reason && ev.reason.stack ? ev.reason.stack : String(ev.reason))); } catch(e){}
+          });
+        } catch(e){}
+
+        // attach run-init handler
+        try {
+          const runBtn = document.getElementById('dbg-runinit');
+          const errorsEl = document.getElementById('dbg-errors');
+          if (runBtn) runBtn.addEventListener('click', async () => {
+            try {
+              // prefer explicit init if present
+              if (typeof window.init === 'function') {
+                await window.init();
+                if (errorsEl) errorsEl.textContent = '(ran window.init)';
+                return;
+              }
+              // try miniapp helpers
+              if (window._miniapp && typeof window._miniapp.fetchUser === 'function') {
+                try { const r = await window._miniapp.fetchUser(); if (errorsEl) errorsEl.textContent = 'fetchUser returned: ' + JSON.stringify(r); } catch(e){ if (errorsEl) errorsEl.textContent = 'fetchUser failed: '+String(e); }
+                return;
+              }
+              // fallback: try ping candidate API_BASE
+              await pingCandidate('window.API_BASE');
+            } catch(e) { if (errorsEl) errorsEl.textContent = 'runinit error: '+String(e); }
+          });
+        } catch(e){}
+
 
         // Attempt to load app script(s) if the app hasn't initialised — helps diagnose blocked/missing script
         try {
