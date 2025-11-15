@@ -232,8 +232,6 @@ async function init() {
   }
 
   // modal close
-  const modalClose = document.getElementById('modal-close');
-  if (modalClose) modalClose.addEventListener('click', hideModal);
 }
 
 // Start
@@ -241,3 +239,14 @@ init().catch(err => console.error(err));
 
 // Debug helper
 window._miniapp = { fetchUser, fetchLootboxes, openLootbox };
+
+// Ensure modal close works even if init fails: attach handlers immediately
+;(function attachModalHandlers(){
+  const modal = document.getElementById('modal');
+  const modalClose = document.getElementById('modal-close');
+  if (modalClose) modalClose.addEventListener('click', hideModal);
+  if (modal) modal.addEventListener('click', (e) => {
+    // close when clicking on the overlay (outside the modal card)
+    if (e.target === modal) hideModal();
+  });
+})();
