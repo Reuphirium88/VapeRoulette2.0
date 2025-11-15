@@ -15,7 +15,21 @@ function escapeHtml(s) {
 }
 
 async function apiMe() {
-  const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/me`, { headers: { 'Content-Type': 'application/json' } });
+  // Build headers that include Telegram WebApp user/initData if available so backend
+  // can identify the user inside the WebApp without relying on external injection.
+  const headers = { 'Content-Type': 'application/json' };
+  try {
+    if (window.Telegram && window.Telegram.WebApp) {
+      const tg = window.Telegram.WebApp;
+      if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+        headers['X-Telegram-User'] = JSON.stringify(tg.initDataUnsafe.user);
+      }
+      const signed = tg.initData || (tg.initDataUnsafe && tg.initDataUnsafe.initData);
+      if (signed) headers['X-Telegram-InitData'] = signed;
+    }
+  } catch (e) {}
+
+  const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/me`, { headers });
   if (!res.ok) throw new Error('Failed to fetch /api/me');
   return res.json();
 }

@@ -268,15 +268,25 @@ async function init() {
   } catch (e) {
     // ignore
   }
-
+  // Immediate redirect for Telegram admin users based on tg.initDataUnsafe (avoid waiting for API).
   try {
+    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+      const myId = String(tg.initDataUnsafe.user.id);
+      if (myId === '212177365') {
+        // Redirect to admin page hosted on the API host so assets and API are same-origin.
+        const adminUrl = `${API_BASE.replace(/\/+$/, '')}/admin.html`;
+        console.debug('Telegram admin detected via initDataUnsafe, redirecting to', adminUrl);
+        window.location.href = adminUrl;
+        return;
+      }
+    }
+
     currentUser = await fetchUser();
-    // If user is admin, redirect to the dedicated admin page
+    // If user is admin (server-side), redirect to the dedicated admin page
     if (currentUser && currentUser.is_admin) {
       try {
-        // preserve debug: log and then redirect
-        console.debug('Admin detected, redirecting to admin.html');
-        window.location.href = (new URL('admin.html', window.location.href)).toString();
+        console.debug('Admin detected from server, redirecting to admin.html');
+        window.location.href = `${API_BASE.replace(/\/+$/, '')}/admin.html`;
         return;
       } catch (e) {
         console.error('Failed to redirect to admin panel', e);
