@@ -1,5 +1,7 @@
 // Lightweight admin UI for Loyalty Mini App
 const API_BASE = window.API_BASE_URL || 'https://grotesquely-pleasing-reedbuck.cloudpub.ru/';
+// expose for debug overlay
+try { window.API_BASE = API_BASE; } catch (e) {}
 
 // Debug: wrap global fetch to capture last fetch details for the debug overlay
 (function(){

@@ -99,7 +99,7 @@
         const fetchEl = document.getElementById('dbg-fetch');
         if (btn && panel) btn.addEventListener('click', () => { panel.style.display = panel.style.display === 'none' ? 'block' : 'none'; });
         function update() {
-          const api = window.API_BASE_URL || (typeof API_BASE !== 'undefined' ? API_BASE : '(not set)');
+          const api = window.API_BASE || window.API_BASE_URL || '(not set)';
           if (apiEl) apiEl.textContent = api;
           try {
             const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : (window.Telegram || null);

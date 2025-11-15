@@ -74,6 +74,8 @@ function showToast(text, ms = 3500) {
 
 
 const API_BASE = window.API_BASE_URL || 'https://grotesquely-pleasing-reedbuck.cloudpub.ru/';
+// expose for debug overlay and other scripts
+try { window.API_BASE = API_BASE; } catch (e) {}
 
 // A small mock user for browser-only preview when Telegram.WebApp is absent
 const BROWSER_MOCK_USER = { id: 0, username: 'demo_user', full_name: 'Demo User', xp_balance: 1000 };
