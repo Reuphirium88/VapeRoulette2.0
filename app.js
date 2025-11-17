@@ -132,8 +132,17 @@ async function fetchUser() {
     const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/me`, { headers });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    // Expecting { id, username, full_name, xp_balance }
-    return data;
+    // Normalise server response to the shape the UI expects.
+    // Server returns { id, name, xp, is_admin } (UserPublic). Map it to
+    // { id, username, full_name, xp_balance, is_admin } for backwards compatibility.
+    const out = {
+      id: data.id,
+      username: data.username || data.name || null,
+      full_name: data.full_name || data.name || data.username || 'Guest',
+      xp_balance: (data.xp !== undefined) ? data.xp : (data.xp_balance !== undefined ? data.xp_balance : 0),
+      is_admin: !!data.is_admin
+    };
+    return out;
   } catch (err) {
     console.error('fetchUser error', err);
   // (debug panel removed) log error to console
